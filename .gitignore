@@ -2,3 +2,4 @@ node_modules
 download
 .env
 .env.local
+src/data.json
