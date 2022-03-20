@@ -39,20 +39,27 @@ const fs_1 = __importStar(require("fs"));
 const path_1 = __importDefault(require("path"));
 const ssh2_sftp_client_1 = __importDefault(require("ssh2-sftp-client"));
 const json_beautify_1 = __importDefault(require("json-beautify"));
-require("dotenv").config();
+const dotenv_1 = __importDefault(require("dotenv"));
 require("events").EventEmitter.defaultMaxListeners = 0;
-const baseDir = "/usr/share/zoneinfo";
+console.log(path_1.default.resolve(__dirname, "../.env.local"));
+if (process.env.NODE_ENV === "production") {
+    dotenv_1.default.config({ path: path_1.default.resolve(__dirname, "../.env") });
+}
+else {
+    dotenv_1.default.config({ path: path_1.default.resolve(__dirname, "../.env.local") });
+}
+const baseDir = process.env.TARGET;
 const localDir = path_1.default.resolve(__dirname, "download");
 console.log(localDir);
 let data = {};
 let fileChange = [];
 // let Client = require("ssh2-sftp-client");
 let sftp = new ssh2_sftp_client_1.default();
-let fileRead = (0, fs_1.readFileSync)(path_1.default.resolve(__dirname, "./data.json"), "utf8");
 if (!(0, fs_1.existsSync)(localDir)) {
     fs_1.default.mkdirSync(localDir);
 }
 try {
+    let fileRead = (0, fs_1.readFileSync)(path_1.default.resolve(__dirname, "data.json"), "utf8");
     data = JSON.parse(fileRead);
 }
 catch (error) {

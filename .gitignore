@@ -1,5 +1,6 @@
 node_modules
-download
-.env
+src/download
 .env.local
 src/data.json
+.dist/data.json
+dist/download

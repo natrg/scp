@@ -2,10 +2,18 @@ import fs, { existsSync, readFileSync, writeFile } from "fs";
 import path from "path";
 import Client, { FileInfo } from "ssh2-sftp-client";
 import beautify from "json-beautify";
-
-require("dotenv").config();
+import dotenv from 'dotenv';
 
 require("events").EventEmitter.defaultMaxListeners = 0;
+
+console.log(path.resolve(__dirname, "../.env.local"));
+
+
+if (process.env.NODE_ENV === "production") {
+  dotenv.config({ path: path.resolve(__dirname, "../.env") });
+} else {
+  dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
+}
 
 const baseDir = process.env.TARGET;
 const localDir = path.resolve(__dirname, "download");
@@ -17,11 +25,11 @@ let fileChange: Array<{ path: string; file: FileInfo }> = [];
 // let Client = require("ssh2-sftp-client");
 let sftp = new Client();
 
-let fileRead = readFileSync(path.resolve(__dirname, "./data.json"), "utf8");
 if (!existsSync(localDir)) {
   fs.mkdirSync(localDir);
 }
 try {
+  let fileRead = readFileSync(path.resolve(__dirname, "data.json"), "utf8");
   data = JSON.parse(fileRead);
 } catch (error: any) {
   console.log(
