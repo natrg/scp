@@ -2,12 +2,11 @@ import fs, { existsSync, readFileSync, writeFile } from "fs";
 import path from "path";
 import Client, { FileInfo } from "ssh2-sftp-client";
 import beautify from "json-beautify";
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 
 require("events").EventEmitter.defaultMaxListeners = 0;
 
 console.log(path.resolve(__dirname, "../.env.local"));
-
 
 if (process.env.NODE_ENV === "production") {
   dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -32,9 +31,7 @@ try {
   let fileRead = readFileSync(path.resolve(__dirname, "data.json"), "utf8");
   data = JSON.parse(fileRead);
 } catch (error: any) {
-  console.log(
-    error.message || "Unable to read file JSON input. Default none"
-  );
+  console.log(error.message || "Unable to read file JSON input. Default none");
 }
 
 refresh();
