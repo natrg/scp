@@ -7,7 +7,7 @@ require("dotenv").config();
 
 require("events").EventEmitter.defaultMaxListeners = 0;
 
-const baseDir = "/usr/share/zoneinfo";
+const baseDir = process.env.TARGET;
 const localDir = path.resolve(__dirname, "download");
 
 console.log(localDir);
