@@ -1,4 +1,4 @@
-import fs, { existsSync, readFileSync, writeFile } from "fs";
+import fs, { existsSync, readFileSync, writeFile, writeFileSync } from "fs";
 import path from "path";
 import Client, { FileInfo } from "ssh2-sftp-client";
 import beautify from "json-beautify";
@@ -16,6 +16,7 @@ if (process.env.NODE_ENV === "production") {
 
 const baseDir = process.env.TARGET;
 const localDir = path.resolve(__dirname, "download");
+const dataPath = path.resolve(__dirname, "data.json");
 
 console.log(localDir);
 
@@ -28,7 +29,7 @@ if (!existsSync(localDir)) {
   fs.mkdirSync(localDir);
 }
 try {
-  let fileRead = readFileSync(path.resolve(__dirname, "data.json"), "utf8");
+  let fileRead = readFileSync(dataPath, "utf8");
   data = JSON.parse(fileRead);
 } catch (error: any) {
   console.log(error.message || "Unable to read file JSON input. Default none");
@@ -37,58 +38,43 @@ try {
 refresh();
 setInterval(refresh, 1000 * 60 * 5);
 
-function refresh() {
+async function refresh() {
   console.log("Refreshing data...");
 
-  sftp
-    .connect({
+  try {
+    await sftp.connect({
       host: process.env.HOST,
       port: Number(process.env.PORT),
       username: process.env.USER,
       password: process.env.PASSWORD,
-    })
-    .then(() => {
-      return readDir(sftp, baseDir);
-    })
-    .then(async () => {
-      // console.log(fileChange);
-      await downloadFile();
-      console.log("Done refresh");
-    })
-    .then(() => {
-      // console.log(data, "the data info");
-      writeFile(
-        path.resolve(__dirname, "data.json"),
-        beautify(data, null as any, 2, 100),
-        (err) => {
-          if (err) {
-            console.log(err);
-          }
-        }
-      );
-    })
-    .then(() => {
-      sftp.end();
-    })
-    .catch((err) => {
-      console.log(err, "catch error");
     });
+    await readDir(sftp, baseDir);
+    if (fileChange.length) {
+      await downloadFile();
+      writeFileSync(dataPath, beautify(data, null as any, 2, 100));
+    }
+    console.log("Done refresh");
+    sftp.end();
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 async function downloadFile() {
-  let downloadResult = await Promise.allSettled(
-    fileChange.map(async (file) => {
-      const folderLocalPath = path.join(localDir, file.path);
+  const downloadPromise = fileChange.map(async (file) => {
+    const folderLocalPath = path.join(localDir, file.path);
+    const remoteFileLocation = file.path + "/" + file.file.name;
+    await fs.promises.mkdir(folderLocalPath, { recursive: true });
+    const res = sftp.get(
+      remoteFileLocation,
+      path.join(folderLocalPath, file.file.name)
+    );
+    data[remoteFileLocation] = file.file;
+    return res;
+  });
 
-      await fs.promises.mkdir(folderLocalPath, { recursive: true });
-      const res = sftp.get(
-        file.path + "/" + file.file.name,
-        path.resolve(folderLocalPath, file.file.name)
-      );
-      data[file.path + "/" + file.file.name] = file.file;
-      return res;
-    })
-  );
+  fileChange = [];
+  const downloadResult = await Promise.allSettled(downloadPromise);
   console.log(
     `Total file changed: ${fileChange.length}. Total file downloaded: ${
       downloadResult.filter((it) => it.status === "fulfilled").length
@@ -100,6 +86,8 @@ async function readDir(client: Client, dirPath: string): Promise<any> {
   const result = await client.list(dirPath);
   const files = result.filter((item) => item.type === "-");
   const folders = result.filter((item) => item.type === "d");
+
+  // Check file changed
   files.forEach((file) => {
     const filePath = dirPath + "/" + file.name;
     if (!data.hasOwnProperty(filePath)) {
@@ -110,11 +98,11 @@ async function readDir(client: Client, dirPath: string): Promise<any> {
       fileChange.push({ path: dirPath, file: file });
     }
   });
-  await Promise.allSettled(
-    folders.map((folder) => {
-      const folderPath = dirPath + "/" + folder.name;
-      return readDir(client, folderPath);
-    })
-  );
-  // console.log("Done: ", dirPath);
+
+  // if node is folder => Read folder
+  const folderReadPromise = folders.map((folder) => {
+    const folderPath = dirPath + "/" + folder.name;
+    return readDir(client, folderPath);
+  });
+  await Promise.allSettled(folderReadPromise);
 }
