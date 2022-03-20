@@ -16,7 +16,6 @@
     "@types/ssh2-sftp-client": "^7.0.1",
     "dotenv": "^16.0.0",
     "json-beautify": "^1.1.1",
-    "node-scp": "^0.0.17",
     "ssh2-sftp-client": "^7.2.2"
   },
   "devDependencies": {

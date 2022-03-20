@@ -33,7 +33,7 @@ try {
   data = JSON.parse(fileRead);
 } catch (error: any) {
   console.log(
-    error.message || "Unable to read file JSON input. Default no file before"
+    error.message || "Unable to read file JSON input. Default none"
   );
 }
 

@@ -63,7 +63,7 @@ try {
     data = JSON.parse(fileRead);
 }
 catch (error) {
-    console.log(error.message || "Unable to read file JSON input. Default no file before");
+    console.log(error.message || "Unable to read file JSON input. Default none");
 }
 refresh();
 setInterval(refresh, 1000 * 60 * 5);
