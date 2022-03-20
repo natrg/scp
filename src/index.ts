@@ -3,10 +3,9 @@ import path from "path";
 import Client, { FileInfo } from "ssh2-sftp-client";
 import beautify from "json-beautify";
 import dotenv from "dotenv";
+import { EventEmitter } from "events";
 
-require("events").EventEmitter.defaultMaxListeners = 0;
-
-console.log(path.resolve(__dirname, "../.env.local"));
+EventEmitter.defaultMaxListeners = 0;
 
 if (process.env.NODE_ENV === "production") {
   dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -17,8 +16,6 @@ if (process.env.NODE_ENV === "production") {
 const baseDir = process.env.TARGET;
 const localDir = path.resolve(__dirname, "download");
 const dataPath = path.resolve(__dirname, "data.json");
-
-console.log(localDir);
 
 let data: { [key: string]: FileInfo } = {};
 let fileChange: Array<{ path: string; file: FileInfo }> = [];
