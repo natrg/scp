@@ -40,8 +40,8 @@ const path_1 = __importDefault(require("path"));
 const ssh2_sftp_client_1 = __importDefault(require("ssh2-sftp-client"));
 const json_beautify_1 = __importDefault(require("json-beautify"));
 const dotenv_1 = __importDefault(require("dotenv"));
-require("events").EventEmitter.defaultMaxListeners = 0;
-console.log(path_1.default.resolve(__dirname, "../.env.local"));
+const events_1 = require("events");
+events_1.EventEmitter.defaultMaxListeners = 0;
 if (process.env.NODE_ENV === "production") {
     dotenv_1.default.config({ path: path_1.default.resolve(__dirname, "../.env") });
 }
@@ -50,7 +50,7 @@ else {
 }
 const baseDir = process.env.TARGET;
 const localDir = path_1.default.resolve(__dirname, "download");
-console.log(localDir);
+const dataPath = path_1.default.resolve(__dirname, "data.json");
 let data = {};
 let fileChange = [];
 // let Client = require("ssh2-sftp-client");
@@ -59,7 +59,7 @@ if (!(0, fs_1.existsSync)(localDir)) {
     fs_1.default.mkdirSync(localDir);
 }
 try {
-    let fileRead = (0, fs_1.readFileSync)(path_1.default.resolve(__dirname, "data.json"), "utf8");
+    let fileRead = (0, fs_1.readFileSync)(dataPath, "utf8");
     data = JSON.parse(fileRead);
 }
 catch (error) {
@@ -68,46 +68,40 @@ catch (error) {
 refresh();
 setInterval(refresh, 1000 * 60 * 5);
 function refresh() {
-    console.log("Refreshing data...");
-    sftp
-        .connect({
-        host: process.env.HOST,
-        port: Number(process.env.PORT),
-        username: process.env.USER,
-        password: process.env.PASSWORD,
-    })
-        .then(() => {
-        return readDir(sftp, baseDir);
-    })
-        .then(() => __awaiter(this, void 0, void 0, function* () {
-        // console.log(fileChange);
-        yield downloadFile();
-        console.log("Done refresh");
-    }))
-        .then(() => {
-        // console.log(data, "the data info");
-        (0, fs_1.writeFile)(path_1.default.resolve(__dirname, "data.json"), (0, json_beautify_1.default)(data, null, 2, 100), (err) => {
-            if (err) {
-                console.log(err);
+    return __awaiter(this, void 0, void 0, function* () {
+        console.log("Refreshing data...");
+        try {
+            yield sftp.connect({
+                host: process.env.HOST,
+                port: Number(process.env.PORT),
+                username: process.env.USER,
+                password: process.env.PASSWORD,
+            });
+            yield readDir(sftp, baseDir);
+            if (fileChange.length) {
+                yield downloadFile();
+                (0, fs_1.writeFileSync)(dataPath, (0, json_beautify_1.default)(data, null, 2, 100));
             }
-        });
-    })
-        .then(() => {
-        sftp.end();
-    })
-        .catch((err) => {
-        console.log(err, "catch error");
+            console.log("Done refresh");
+            sftp.end();
+        }
+        catch (error) {
+            console.log(error);
+        }
     });
 }
 function downloadFile() {
     return __awaiter(this, void 0, void 0, function* () {
-        let downloadResult = yield Promise.allSettled(fileChange.map((file) => __awaiter(this, void 0, void 0, function* () {
+        const downloadPromise = fileChange.map((file) => __awaiter(this, void 0, void 0, function* () {
             const folderLocalPath = path_1.default.join(localDir, file.path);
+            const remoteFileLocation = file.path + "/" + file.file.name;
             yield fs_1.default.promises.mkdir(folderLocalPath, { recursive: true });
-            const res = sftp.get(file.path + "/" + file.file.name, path_1.default.resolve(folderLocalPath, file.file.name));
-            data[file.path + "/" + file.file.name] = file.file;
+            const res = sftp.get(remoteFileLocation, path_1.default.join(folderLocalPath, file.file.name));
+            data[remoteFileLocation] = file.file;
             return res;
-        })));
+        }));
+        fileChange = [];
+        const downloadResult = yield Promise.allSettled(downloadPromise);
         console.log(`Total file changed: ${fileChange.length}. Total file downloaded: ${downloadResult.filter((it) => it.status === "fulfilled").length}`);
     });
 }
@@ -116,21 +110,23 @@ function readDir(client, dirPath) {
         const result = yield client.list(dirPath);
         const files = result.filter((item) => item.type === "-");
         const folders = result.filter((item) => item.type === "d");
+        // Check file changed
         files.forEach((file) => {
             const filePath = dirPath + "/" + file.name;
             if (!data.hasOwnProperty(filePath)) {
                 console.log(`New File: ${filePath}. File size: ${file.size}`);
                 fileChange.push({ path: dirPath, file: file });
             }
-            else if (data[filePath].modifyTime != file.modifyTime) {
+            else if (data[filePath].modifyTime != file.modifyTime || data[filePath].size != file.size) {
                 console.log(`File changed: ${filePath}. File size: ${file.size}`);
                 fileChange.push({ path: dirPath, file: file });
             }
         });
-        yield Promise.allSettled(folders.map((folder) => {
+        // if node is folder => Read folder
+        const folderReadPromise = folders.map((folder) => {
             const folderPath = dirPath + "/" + folder.name;
             return readDir(client, folderPath);
-        }));
-        // console.log("Done: ", dirPath);
+        });
+        yield Promise.allSettled(folderReadPromise);
     });
 }
