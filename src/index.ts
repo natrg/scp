@@ -90,7 +90,7 @@ async function readDir(client: Client, dirPath: string): Promise<any> {
     if (!data.hasOwnProperty(filePath)) {
       console.log(`New File: ${filePath}. File size: ${file.size}`);
       fileChange.push({ path: dirPath, file: file });
-    } else if (data[filePath].modifyTime != file.modifyTime) {
+    } else if (data[filePath].modifyTime != file.modifyTime || data[filePath].size != file.size) {
       console.log(`File changed: ${filePath}. File size: ${file.size}`);
       fileChange.push({ path: dirPath, file: file });
     }
